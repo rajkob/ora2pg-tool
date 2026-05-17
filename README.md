@@ -40,7 +40,8 @@ cd ora2pg-tool
     -PgPass     secret `
     -PgSchema   scott `              # destination schema in PG (default: OraSchema lowercased)
     -Tables     "ORDERS,CUSTOMERS,PRODUCTS" `   # omit to migrate all tables
-    -PreserveCase                    # omit this flag to get lowercase identifiers (default)
+    -PreserveCase                    # with flag: SCOTT.EMPLOYEE_ID -> "EMPLOYEE_ID" (quoted uppercase, app must quote too)
+                                     # without flag (default): SCOTT.EMPLOYEE_ID -> employee_id (standard PG lowercase)
 ```
 
 Output files (DDL only) land in `.\schema\` in the current directory. Row data is written **directly to PostgreSQL** — no intermediate data files are created.
@@ -68,7 +69,8 @@ chmod +x migrate.sh
     --pg-pass     secret \
     --pg-schema   scott \
     --tables      "ORDERS,CUSTOMERS,PRODUCTS" \
-    --preserve-case          # omit this flag to get lowercase identifiers (default)
+    --preserve-case          # with flag: SCOTT.EMPLOYEE_ID -> "EMPLOYEE_ID" (quoted uppercase, app must quote too)
+                             # without flag (default): SCOTT.EMPLOYEE_ID -> employee_id (standard PG lowercase)
 ```
 
 ---
