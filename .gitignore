@@ -5,6 +5,9 @@
 _run.env
 _run.conf
 
+# ── Maintainer-only docs (never publish) ─────────────────────────────────────
+MAINTAINER.md
+
 # ── Oracle Instant Client ZIPs (large binaries, download separately) ──────────
 vendor/*.zip
 

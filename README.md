@@ -141,32 +141,6 @@ make all           # full pipeline in one shot
 
 ---
 
-## For maintainers -- building a new image version
-
-You need the Oracle Instant Client ZIPs in `vendor/` (not tracked by git --
-see `vendor/README.md` for download links).
-
-```powershell
-# 1. Build locally (uses Dockerfile + vendor/ ZIPs)
-docker compose build
-
-# 2. Tag
-docker tag ora2pg:local rajkob/ora2pg:25.0
-docker tag ora2pg:local rajkob/ora2pg:latest
-
-# 3. Push
-docker push rajkob/ora2pg:25.0
-docker push rajkob/ora2pg:latest
-```
-
-To build a different Ora2Pg version:
-
-```bash
-docker compose build --build-arg ORA2PG_VERSION=25.1
-```
-
----
-
 ## Repository layout
 
 ```
