@@ -41,7 +41,7 @@ cd ora2pg-tool
     -Tables     "ORDERS,CUSTOMERS,PRODUCTS"   # omit to migrate all tables
 ```
 
-Output files land in `.\schema\` and `.\data\` in the current directory.
+Output files (DDL only) land in `.\schema\` in the current directory. Row data is written **directly to PostgreSQL** — no intermediate data files are created.
 
 ---
 
@@ -95,6 +95,7 @@ chmod +x migrate.sh
 | `-PgUser` | `--pg-user` | **required** | PostgreSQL username |
 | `-PgPass` | `--pg-pass` | **required** | PostgreSQL password |
 | `-PgSchema` | `--pg-schema` | OraSchema lowercased | Target schema inside the PG database |
+| `-PgVersion` | `--pg-version` | auto-detected | PostgreSQL major version (e.g. `16`). Auto-detected from the server at runtime; override only if auto-detection fails. |
 
 ### Mode flags
 
@@ -115,10 +116,10 @@ chmod +x migrate.sh
 4. If `-Tables` was given, verifies the tables exist in the Oracle schema.
 5. **Schema export** -- runs TABLE, SEQUENCE, INDEX, TRIGGER, VIEW to `schema/*.sql`.
 6. **Schema import** -- loads each `schema/*.sql` into PostgreSQL via `psql`.
-7. **Data export** -- runs COPY mode to `data/data.sql`.
-8. **Data import** -- loads `data/data.sql` into PostgreSQL via `psql`.
+7. **Data migration** -- ora2pg streams rows **directly from Oracle into PostgreSQL** via its own DBI connection (INSERT mode). No intermediate file is written.
+8. **Row count summary** -- runs `ANALYZE` then prints per-table row counts from `pg_class` so you can confirm the migration.
 
-Steps 5-6 are skipped with `-DataOnly`; steps 7-8 are skipped with `-SchemaOnly`.
+Steps 5-6 are skipped with `-DataOnly`; step 7-8 are skipped with `-SchemaOnly`.
 
 ---
 
