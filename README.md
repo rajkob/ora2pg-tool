@@ -37,7 +37,8 @@ cd ora2pg-tool
     -PgHost     pg.example.com `
     -PgDb       targetdb `
     -PgUser     postgres `
-    -PgPass     secret
+    -PgPass     secret `
+    -Tables     "ORDERS,CUSTOMERS,PRODUCTS"   # omit to migrate all tables
 ```
 
 Output files land in `.\schema\` and `.\data\` in the current directory.
@@ -53,7 +54,17 @@ cd ora2pg-tool
 chmod +x migrate.sh
 
 # Run a full migration
-./migrate.sh     --ora-host    prod-oracle.example.com     --ora-service ORCL     --ora-user    scott     --ora-pass    tiger     --ora-schema  SCOTT     --pg-host     pg.example.com     --pg-db       targetdb     --pg-user     postgres     --pg-pass     secret
+./migrate.sh \
+    --ora-host    prod-oracle.example.com \
+    --ora-service ORCL \
+    --ora-user    scott \
+    --ora-pass    tiger \
+    --ora-schema  SCOTT \
+    --pg-host     pg.example.com \
+    --pg-db       targetdb \
+    --pg-user     postgres \
+    --pg-pass     secret \
+    --tables      "ORDERS,CUSTOMERS,PRODUCTS"   # omit to migrate all tables
 ```
 
 ---
