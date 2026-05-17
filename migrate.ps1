@@ -57,9 +57,10 @@ param(
     [int]    $PgVersion  = 16,  # PG major version fallback (auto-detected from server when reachable)
 
     # ── Mode ───────────────────────────────────────────────────────────────────
-    [switch] $PreflightOnly,  # Run checks only, do not migrate
-    [switch] $SchemaOnly,     # Export + import DDL only, skip data
-    [switch] $DataOnly        # Skip DDL, export + import data only
+    [switch] $PreflightOnly,   # Run checks only, do not migrate
+    [switch] $SchemaOnly,      # Export + import DDL only, skip data
+    [switch] $DataOnly,        # Skip DDL, export + import data only
+    [switch] $PreserveCase     # Keep Oracle identifier case (UPPERCASE) in PostgreSQL
 )
 
 $ErrorActionPreference = "Stop"
@@ -120,6 +121,7 @@ NLS_LANG        AMERICAN_AMERICA.AL32UTF8
 DATA_LIMIT      10000
 PG_VERSION      ${PgVersion}
 ${allowLine}
+$(if ($PreserveCase) { 'PRESERVE_CASE   1' })
 "@ | Set-Content $CONF -Encoding ascii
 
     New-Item -ItemType Directory -Force -Path schema, logs | Out-Null

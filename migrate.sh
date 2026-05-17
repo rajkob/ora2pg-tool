@@ -55,6 +55,7 @@ PG_VERSION="16"
 PREFLIGHT_ONLY=false
 SCHEMA_ONLY=false
 DATA_ONLY=false
+PRESERVE_CASE=false
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 step() { printf "\n\033[36m[*] %s\033[0m\n" "$*"; }
@@ -83,9 +84,10 @@ while [[ $# -gt 0 ]]; do
         --tables)        TABLES="$2";      shift 2 ;;
         --pg-schema)     PG_SCHEMA="$2";   shift 2 ;;
         --pg-version)    PG_VERSION="$2";  shift 2 ;;
-        --preflight-only) PREFLIGHT_ONLY=true; shift ;;
-        --schema-only)   SCHEMA_ONLY=true; shift ;;
-        --data-only)     DATA_ONLY=true;   shift ;;
+        --preflight-only)  PREFLIGHT_ONLY=true;  shift ;;
+        --schema-only)    SCHEMA_ONLY=true;    shift ;;
+        --data-only)      DATA_ONLY=true;      shift ;;
+        --preserve-case)  PRESERVE_CASE=true;  shift ;;
         *) fail "Unknown option: $1" ;;
     esac
 done
@@ -144,6 +146,7 @@ NLS_LANG        AMERICAN_AMERICA.AL32UTF8
 DATA_LIMIT      10000
 PG_VERSION      ${PG_VERSION}
 ${ALLOW_LINE}
+$( $PRESERVE_CASE && echo 'PRESERVE_CASE   1' )
 EOF
 
 mkdir -p schema logs
