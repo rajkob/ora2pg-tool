@@ -38,7 +38,9 @@ cd ora2pg-tool
     -PgDb       targetdb `
     -PgUser     postgres `
     -PgPass     secret `
-    -Tables     "ORDERS,CUSTOMERS,PRODUCTS"   # omit to migrate all tables
+    -PgSchema   scott `              # destination schema in PG (default: OraSchema lowercased)
+    -Tables     "ORDERS,CUSTOMERS,PRODUCTS" `   # omit to migrate all tables
+    -PreserveCase                    # omit this flag to get lowercase identifiers (default)
 ```
 
 Output files (DDL only) land in `.\schema\` in the current directory. Row data is written **directly to PostgreSQL** — no intermediate data files are created.
@@ -64,7 +66,9 @@ chmod +x migrate.sh
     --pg-db       targetdb \
     --pg-user     postgres \
     --pg-pass     secret \
-    --tables      "ORDERS,CUSTOMERS,PRODUCTS"   # omit to migrate all tables
+    --pg-schema   scott \
+    --tables      "ORDERS,CUSTOMERS,PRODUCTS" \
+    --preserve-case          # omit this flag to get lowercase identifiers (default)
 ```
 
 ---
