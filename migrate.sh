@@ -63,7 +63,7 @@ ok()   { printf "\033[32m[+] %s\033[0m\n" "$*"; }
 info() { printf "    %s\n" "$*"; }
 fail() { printf "\n\033[31m[!] %s\033[0m\n" "$*"; exit 1; }
 
-cleanup() { rm -f "$CONF" "$ENV"; }
+cleanup() { rm -f "$CONF" "$ENV" "_run_insert.conf"; }
 trap cleanup EXIT
 
 # ── Parse args ─────────────────────────────────────────────────────────────────
@@ -233,12 +233,29 @@ if ! $DATA_ONLY; then
     fi
 fi
 
-# ── DATA: Migrate directly to PostgreSQL via DBI ───────────────────────────────
-# When PG_DSN is configured, ora2pg INSERT type writes directly to PostgreSQL
-# through its own DBI connection — no intermediate file or psql pipe needed.
+# ── DATA: Migrate Oracle → PostgreSQL ─────────────────────────────────────────
+# With PRESERVE_CASE, tables are created as "DEPARTMENTS" (quoted uppercase).
+# ora2pg's direct DBI INSERT checks for unquoted table names, which PostgreSQL
+# folds to lowercase — they won't be found.  Fall back to file-based INSERT
+# (the generated SQL carries correctly quoted identifiers) then load via psql.
 if ! $SCHEMA_ONLY; then
-    step "Migrating data (direct INSERT to PostgreSQL)"
-    run_ora2pg -t INSERT
+    if $PRESERVE_CASE; then
+        step "Migrating data (file-based INSERT, required for PRESERVE_CASE mode)"
+        # Strip PG_DSN: when present, ora2pg checks destination tables for existence
+        # using lowercase names, which fails for PRESERVE_CASE uppercase tables.
+        # Without PG_DSN ora2pg just generates INSERT SQL with quoted identifiers.
+        _insert_conf="_run_insert.conf"
+        grep -v '^PG_DSN' "$CONF" > "$_insert_conf"
+        _old_conf="$CONF"
+        CONF="$_insert_conf"
+        run_ora2pg -t INSERT -o "data_tmp.sql" -b "/work/schema"
+        CONF="$_old_conf"
+        run_psql -f "/work/schema/data_tmp.sql"
+        rm -f "$_insert_conf" "schema/data_tmp.sql"
+    else
+        step "Migrating data (direct INSERT to PostgreSQL)"
+        run_ora2pg -t INSERT
+    fi
     ok "Data migrated to $PG_DB"
 
     step "Row count summary"

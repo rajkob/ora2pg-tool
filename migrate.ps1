@@ -76,7 +76,7 @@ function Info($m) { Write-Host "    $m" }
 function Fail($m) { Write-Host "`n[!] $m" -ForegroundColor Red; throw $m }
 
 function Cleanup {
-    Remove-Item -Force -ErrorAction SilentlyContinue $CONF, $ENV
+    Remove-Item -Force -ErrorAction SilentlyContinue $CONF, $ENV, "_run_insert.conf"
 }
 
 try {
@@ -221,12 +221,27 @@ $(if ($PreserveCase) { 'PRESERVE_CASE   1' })
         }
     }
 
-    # ── DATA: Migrate directly to PostgreSQL via DBI ───────────────────────────
-    # When PG_DSN is configured, ora2pg INSERT type writes directly to PostgreSQL
-    # through its own DBI connection — no intermediate file or psql pipe needed.
+    # ── DATA: Migrate Oracle → PostgreSQL ─────────────────────────────────────
+    # With PRESERVE_CASE, tables are created as "DEPARTMENTS" (quoted uppercase).
+    # ora2pg's direct DBI INSERT checks for unquoted table names, which PostgreSQL
+    # folds to lowercase — they won't be found.  Fall back to file-based INSERT
+    # (the generated SQL carries correctly quoted identifiers) then load via psql.
     if (-not $SchemaOnly) {
-        Step "Migrating data (direct INSERT to PostgreSQL)"
-        Invoke-Ora2pg "-t", "INSERT"
+        if ($PreserveCase) {
+            Step "Migrating data (file-based INSERT, required for PRESERVE_CASE mode)"
+            # Strip PG_DSN: when present, ora2pg checks destination tables for existence
+            # using lowercase names, which fails for PRESERVE_CASE uppercase tables.
+            $insertConf = "_run_insert.conf"
+            (Get-Content $CONF) | Where-Object { $_ -notmatch '^PG_DSN' } | Set-Content $insertConf -Encoding ascii
+            & docker compose run --rm -T --env-file $ENV ora2pg `
+                -c "/work/$insertConf" -t INSERT -o "data_tmp.sql" -b "/work/schema"
+            if ($LASTEXITCODE -ne 0) { Fail "ora2pg INSERT export failed" }
+            Invoke-Psql "-f", "/work/schema/data_tmp.sql"
+            Remove-Item -ErrorAction SilentlyContinue $insertConf, "schema\data_tmp.sql"
+        } else {
+            Step "Migrating data (direct INSERT to PostgreSQL)"
+            Invoke-Ora2pg "-t", "INSERT"
+        }
         Ok "Data migrated to $PgDb"
 
         Step "Row count summary"
