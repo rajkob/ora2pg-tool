@@ -105,6 +105,7 @@ chmod +x migrate.sh
 | `-PreflightOnly` | `--preflight-only` | Test connectivity only -- do not migrate anything. |
 | `-SchemaOnly` | `--schema-only` | Export and import DDL only, skip data. |
 | `-DataOnly` | `--data-only` | Export and import data only, skip DDL. |
+| `-PreserveCase` | `--preserve-case` | Keep Oracle identifier case in PostgreSQL. By default, Oracle `EMPLOYEE_ID` becomes `employee_id` (lowercase). With this flag it stays `"EMPLOYEE_ID"` (quoted uppercase). Note: your application queries must then use quoted identifiers. |
 
 ---
 
@@ -116,7 +117,7 @@ chmod +x migrate.sh
 4. If `-Tables` was given, verifies the tables exist in the Oracle schema.
 5. **Schema export** -- runs TABLE, SEQUENCE, INDEX, TRIGGER, VIEW to `schema/*.sql`.
 6. **Schema import** -- loads each `schema/*.sql` into PostgreSQL via `psql`.
-7. **Data migration** -- ora2pg streams rows **directly from Oracle into PostgreSQL** via its own DBI connection (INSERT mode). No intermediate file is written.
+7. **Data migration** -- by default, ora2pg streams rows **directly from Oracle into PostgreSQL** via its own DBI connection (INSERT mode). No intermediate file is written. When `--preserve-case` / `-PreserveCase` is used, a file-based INSERT is performed instead (exported to a temp file, then loaded via `psql`) because the direct DBI path cannot match quoted uppercase table names.
 8. **Row count summary** -- runs `ANALYZE` then prints per-table row counts from `pg_class` so you can confirm the migration.
 
 Steps 5-6 are skipped with `-DataOnly`; step 7-8 are skipped with `-SchemaOnly`.
