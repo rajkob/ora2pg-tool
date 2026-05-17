@@ -52,8 +52,9 @@ param(
     [Parameter(Mandatory)][string] $PgPass,
 
     # ── Scope ──────────────────────────────────────────────────────────────────
-    [string] $Tables   = "",  # Comma- or space-separated table names; "" = all tables
-    [string] $PgSchema = "",  # Target PG schema; defaults to OraSchema lowercased
+    [string] $Tables     = "",  # Comma- or space-separated table names; "" = all tables
+    [string] $PgSchema   = "",  # Target PG schema; defaults to OraSchema lowercased
+    [int]    $PgVersion  = 16,  # PG major version fallback (auto-detected from server when reachable)
 
     # ── Mode ───────────────────────────────────────────────────────────────────
     [switch] $PreflightOnly,  # Run checks only, do not migrate
@@ -106,21 +107,22 @@ try {
     @"
 ORACLE_DSN      ${oraDsn}
 ORACLE_USER     ${OraUser}
-ORACLE_PWD      ENV{ORA_PWD}
+ORACLE_PWD      ${OraPass}
 SCHEMA          ${OraSchema}
 
 PG_DSN          dbi:Pg:host=${PgHost};port=${PgPort};dbname=${PgDb}
 PG_USER         ${PgUser}
-PG_PWD          ENV{PG_PWD}
+PG_PWD          ${PgPass}
 PG_SCHEMA       ${pgTarget}
 
 OUTPUT_DIR      /work/schema
 NLS_LANG        AMERICAN_AMERICA.AL32UTF8
 DATA_LIMIT      10000
+PG_VERSION      ${PgVersion}
 ${allowLine}
 "@ | Set-Content $CONF -Encoding ascii
 
-    New-Item -ItemType Directory -Force -Path schema, data, logs | Out-Null
+    New-Item -ItemType Directory -Force -Path schema, logs | Out-Null
     Ok "Config written"
 
     # ── Ensure Docker image exists ─────────────────────────────────────────────
@@ -163,6 +165,16 @@ ${allowLine}
     }
     Ok "PostgreSQL reachable"
 
+    # Auto-detect PostgreSQL major version from the live server (overrides -PgVersion fallback)
+    $_pgVerNum = (& docker compose run --rm -T --env-file $ENV --entrypoint psql ora2pg `
+        -h $PgHost -p $PgPort -U $PgUser -d $PgDb -A -t -c "SHOW server_version_num;" 2>$null) -join ""
+    if ($_pgVerNum -match '^\d+$') {
+        $PgVersion = [Math]::Floor([int]$_pgVerNum / 10000)
+        (Get-Content $CONF) -replace '^PG_VERSION\s+\d+', "PG_VERSION      $PgVersion" |
+            Set-Content $CONF -Encoding ascii
+        Ok "Auto-detected PostgreSQL $PgVersion"
+    }
+
     # ── PREFLIGHT: Verify tables exist ─────────────────────────────────────────
     if ($tableArr.Count -gt 0) {
         Step "Preflight — Verifying tables in schema $OraSchema"
@@ -201,24 +213,29 @@ ${allowLine}
             }
         }
         Ok "Schema imported into $PgDb"
+        if (Test-Path "schema\table.sql") {
+            $tc = (Select-String -Path "schema\table.sql" -Pattern "^CREATE TABLE" -AllMatches).Matches.Count
+            Info "  $tc table(s) queued for data migration"
+        }
     }
 
-    # ── DATA: Export ───────────────────────────────────────────────────────────
+    # ── DATA: Migrate directly to PostgreSQL via DBI ───────────────────────────
+    # When PG_DSN is configured, ora2pg INSERT type writes directly to PostgreSQL
+    # through its own DBI connection — no intermediate file or psql pipe needed.
     if (-not $SchemaOnly) {
-        Step "Exporting data (COPY)"
-        Invoke-Ora2pg "-t", "COPY", "-o", "/work/data/data.sql"
-        Ok "Data  →  data\data.sql"
+        Step "Migrating data (direct INSERT to PostgreSQL)"
+        Invoke-Ora2pg "-t", "INSERT"
+        Ok "Data migrated to $PgDb"
 
-        # ── DATA: Import ───────────────────────────────────────────────────────
-        Step "Importing data into PostgreSQL"
-        Invoke-Psql "-f", "/work/data/data.sql"
-        Ok "Data imported into $PgDb"
+        Step "Row count summary"
+        # ANALYZE refreshes pg_class.reltuples (accurate post-bulk-load row estimates)
+        $countQuery = "ANALYZE; SELECT c.relname AS table_name, c.reltuples::bigint AS rows FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = '$pgTarget' AND c.relkind = 'r' ORDER BY c.relname;"
+        Invoke-Psql "-c", $countQuery
     }
 
     Write-Host ""
     Ok "=== Migration complete ==="
     Info "Schema artifacts : .\schema\"
-    Info "Data artifacts   : .\data\"
     Info "Logs             : .\logs\"
 
 } finally {

@@ -21,6 +21,9 @@ logs/
 ora2pg.conf
 ora2pg_*.conf
 
+# ── Local test environment (not for distribution) ─────────────────────────────
+test/
+
 # ── OS / editor ───────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

@@ -15,6 +15,9 @@ ORACLE_DSN      dbi:Oracle:host=ORACLE_HOST;port=1521;service_name=ORCL
 ORACLE_USER     ora2pg_user
 
 # Password — use the env var so the plaintext stays in .env, not here
+# NOTE: ENV{} substitution is NOT reliable inside Docker containers.
+# If using migrate.ps1 / migrate.sh the password is substituted directly
+# by the wrapper script at runtime; this file is only used with `make` targets.
 ORACLE_PWD      ENV{ORA_PWD}
 
 # Oracle schema(s) to migrate (space-separated for multiple)
@@ -27,6 +30,10 @@ SCHEMA          MY_SCHEMA
 PG_DSN          dbi:Pg:host=PG_HOST;port=5432;dbname=mydb
 PG_USER         postgres
 PG_PWD          ENV{PG_PWD}
+
+# Target PostgreSQL major version — must match your actual server version.
+# Controls which SQL syntax/features ora2pg generates.
+PG_VERSION      16
 
 #------------------------------------------------------------------------------
 # Migration type
@@ -54,7 +61,7 @@ NLS_LANG        AMERICAN_AMERICA.AL32UTF8
 # Common tuning knobs (uncomment as needed)
 #------------------------------------------------------------------------------
 
-# Parallel data export workers
+# Parallel data export workers (speeds up large schemas)
 #JOBS            4
 
 # Rows per INSERT/COPY batch

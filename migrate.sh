@@ -24,6 +24,7 @@
 #   --pg-pass         PostgreSQL password                  (required)
 #   --tables          Comma/space-separated table names    (default: all)
 #   --pg-schema       Target PG schema                     (default: ora-schema lowercased)
+#   --pg-version      PG major version fallback             (default: 16, auto-detected from server)
 #   --preflight-only  Run connectivity + table checks only
 #   --schema-only     Export/import DDL only, skip data
 #   --data-only       Export/import data only, skip DDL
@@ -50,6 +51,7 @@ PG_PASS=""
 
 TABLES=""
 PG_SCHEMA=""
+PG_VERSION="16"
 PREFLIGHT_ONLY=false
 SCHEMA_ONLY=false
 DATA_ONLY=false
@@ -80,6 +82,7 @@ while [[ $# -gt 0 ]]; do
         --pg-pass)       PG_PASS="$2";     shift 2 ;;
         --tables)        TABLES="$2";      shift 2 ;;
         --pg-schema)     PG_SCHEMA="$2";   shift 2 ;;
+        --pg-version)    PG_VERSION="$2";  shift 2 ;;
         --preflight-only) PREFLIGHT_ONLY=true; shift ;;
         --schema-only)   SCHEMA_ONLY=true; shift ;;
         --data-only)     DATA_ONLY=true;   shift ;;
@@ -128,21 +131,22 @@ chmod 600 "$ENV"
 cat > "$CONF" <<EOF
 ORACLE_DSN      ${ORA_DSN}
 ORACLE_USER     ${ORA_USER}
-ORACLE_PWD      ENV{ORA_PWD}
+ORACLE_PWD      ${ORA_PASS}
 SCHEMA          ${ORA_SCHEMA}
 
 PG_DSN          dbi:Pg:host=${PG_HOST};port=${PG_PORT};dbname=${PG_DB}
 PG_USER         ${PG_USER}
-PG_PWD          ENV{PG_PWD}
+PG_PWD          ${PG_PASS}
 PG_SCHEMA       ${PG_SCHEMA}
 
 OUTPUT_DIR      /work/schema
 NLS_LANG        AMERICAN_AMERICA.AL32UTF8
 DATA_LIMIT      10000
+PG_VERSION      ${PG_VERSION}
 ${ALLOW_LINE}
 EOF
 
-mkdir -p schema data logs
+mkdir -p schema logs
 ok "Config written"
 
 # ── Helper: run ora2pg ─────────────────────────────────────────────────────────
@@ -178,6 +182,15 @@ if ! PG_OUT=$(run_psql -c "SELECT 1" 2>&1); then
 fi
 ok "PostgreSQL reachable"
 
+# Auto-detect PostgreSQL major version from the live server (overrides --pg-version fallback)
+_pgvernum=$(run_psql -A -t -c "SHOW server_version_num;" 2>/dev/null | tr -d '[:space:]')
+if [[ "$_pgvernum" =~ ^[0-9]+$ ]]; then
+    PG_VERSION=$(( _pgvernum / 10000 ))
+    _tmp=$(mktemp)
+    awk -v v="$PG_VERSION" '/^PG_VERSION/{print "PG_VERSION      " v; next} {print}' "$CONF" > "$_tmp" && mv "$_tmp" "$CONF"
+    ok "Auto-detected PostgreSQL $PG_VERSION"
+fi
+
 # ── PREFLIGHT: Verify tables ───────────────────────────────────────────────────
 if [[ ${#TABLE_ARR[@]} -gt 0 ]]; then
     step "Preflight — Verifying tables in schema $ORA_SCHEMA"
@@ -211,21 +224,26 @@ if ! $DATA_ONLY; then
         fi
     done
     ok "Schema imported into $PG_DB"
+    if [[ -f "schema/table.sql" ]]; then
+        _tc=$(grep -ic "^CREATE TABLE" "schema/table.sql" 2>/dev/null || echo 0)
+        info "  ${_tc} table(s) queued for data migration"
+    fi
 fi
 
-# ── DATA: Export + Import ──────────────────────────────────────────────────────
+# ── DATA: Migrate directly to PostgreSQL via DBI ───────────────────────────────
+# When PG_DSN is configured, ora2pg INSERT type writes directly to PostgreSQL
+# through its own DBI connection — no intermediate file or psql pipe needed.
 if ! $SCHEMA_ONLY; then
-    step "Exporting data (COPY)"
-    run_ora2pg -t COPY -o /work/data/data.sql
-    ok "Data  →  data/data.sql"
+    step "Migrating data (direct INSERT to PostgreSQL)"
+    run_ora2pg -t INSERT
+    ok "Data migrated to $PG_DB"
 
-    step "Importing data into PostgreSQL"
-    run_psql -f /work/data/data.sql
-    ok "Data imported into $PG_DB"
+    step "Row count summary"
+    # ANALYZE refreshes pg_class.reltuples (accurate post-bulk-load row estimates)
+    run_psql -c "ANALYZE; SELECT c.relname AS table_name, c.reltuples::bigint AS rows FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = '${PG_SCHEMA}' AND c.relkind = 'r' ORDER BY c.relname;"
 fi
 
 printf "\n"
 ok "=== Migration complete ==="
 info "Schema artifacts : ./schema/"
-info "Data artifacts   : ./data/"
 info "Logs             : ./logs/"
