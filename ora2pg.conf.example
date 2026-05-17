@@ -1,0 +1,70 @@
+# ora2pg.conf.example — copy to ora2pg.conf and edit before running
+#
+#   cp ora2pg.conf.example ora2pg.conf
+#
+# Reference: https://ora2pg.darold.net/documentation.html
+
+#------------------------------------------------------------------------------
+# Oracle source connection
+#------------------------------------------------------------------------------
+
+# Oracle DSN — adjust host, port, and service name
+ORACLE_DSN      dbi:Oracle:host=ORACLE_HOST;port=1521;service_name=ORCL
+
+# Oracle user with at minimum SELECT ANY DICTIONARY privilege
+ORACLE_USER     ora2pg_user
+
+# Password — use the env var so the plaintext stays in .env, not here
+ORACLE_PWD      ENV{ORA_PWD}
+
+# Oracle schema(s) to migrate (space-separated for multiple)
+SCHEMA          MY_SCHEMA
+
+#------------------------------------------------------------------------------
+# PostgreSQL target connection
+#------------------------------------------------------------------------------
+
+PG_DSN          dbi:Pg:host=PG_HOST;port=5432;dbname=mydb
+PG_USER         postgres
+PG_PWD          ENV{PG_PWD}
+
+#------------------------------------------------------------------------------
+# Migration type
+# Common values: TABLE VIEW SEQUENCE INDEX TRIGGER FUNCTION PROCEDURE
+#                GRANT COPY INSERT SHOW_VERSION SHOW_SCHEMA SHOW_TABLE
+#                SHOW_REPORT
+#------------------------------------------------------------------------------
+
+TYPE            TABLE
+
+#------------------------------------------------------------------------------
+# Output
+#------------------------------------------------------------------------------
+
+OUTPUT_DIR      /work/schema
+OUTPUT          output.sql
+
+# Set to 1 to also write a restore log
+LOG_ON_ERROR    0
+
+# Encoding
+NLS_LANG        AMERICAN_AMERICA.AL32UTF8
+
+#------------------------------------------------------------------------------
+# Common tuning knobs (uncomment as needed)
+#------------------------------------------------------------------------------
+
+# Parallel data export workers
+#JOBS            4
+
+# Rows per INSERT/COPY batch
+#DATA_LIMIT      10000
+
+# Exclude specific tables (regex)
+#EXCLUDE         ^TMP_
+
+# Include only specific tables (regex)
+#ALLOW           ^(ORDERS|CUSTOMERS)$
+
+# Preserve Oracle case for identifiers (default: lowercase)
+#PRESERVE_CASE   1

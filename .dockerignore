@@ -1,0 +1,20 @@
+# Don't ship secrets or junk into the build context
+.env
+.env.*
+!.env.example
+logs/
+schema/
+data/
+*.log
+*.bak
+.git/
+.gitignore
+.DS_Store
+
+# Don't bake the host's config into the image — it's mounted at runtime
+ora2pg.conf
+ora2pg_*.conf
+
+# Keep vendor ZIPs (needed at build time)
+!vendor/
+!vendor/*.zip

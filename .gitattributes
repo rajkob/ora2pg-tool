@@ -1,0 +1,11 @@
+# Keep shell scripts and Dockerfile with LF line endings on all platforms
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+Makefile    text eol=lf
+
+# Windows scripts and configs — auto-normalise
+*.ps1       text
+*.yml       text
+*.conf      text
+*.md        text
+*.example   text

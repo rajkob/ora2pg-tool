@@ -1,0 +1,21 @@
+# Bring up: docker compose run --rm ora2pg -c /work/ora2pg.conf -t SHOW_VERSION
+#
+# The current directory (with ora2pg.conf and any *.conf files) is mounted
+# read-write at /work inside the container. Outputs land in ./schema, ./data,
+# and ./logs on the host.
+
+services:
+  ora2pg:
+    image: rajkob/ora2pg:25.0
+    container_name: ora2pg
+    env_file:
+      - path: .env
+        required: false   # migrate.ps1 / migrate.sh pass credentials via --env-file _run.env
+    volumes:
+      - ./:/work
+    working_dir: /work
+    # Override the default `--version` entrypoint command at the CLI:
+    #   docker compose run --rm ora2pg -c /work/ora2pg.conf -t SHOW_REPORT
+    # Network mode "host" is convenient if Oracle/PG are reachable only from
+    # the host's network. Comment out if your DBs are reachable directly.
+    # network_mode: host
